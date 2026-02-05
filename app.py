@@ -116,7 +116,7 @@ def agent_strategy_brain(sf_data, file_context, key):
 
     try:
         genai.configure(api_key=key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-3-flash-preview')
         
         full_context = f"""
         PROJECT: {sf_data['Name']}
@@ -366,3 +366,4 @@ if uploaded_files:
         )
 else:
     st.info("👈 Please upload the 'SGS - Perth.pdf' (or multiple files) in the sidebar to start.")
+
