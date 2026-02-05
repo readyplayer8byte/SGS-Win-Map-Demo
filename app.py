@@ -25,29 +25,42 @@ st.sidebar.subheader("Simulation Setup")
 opp_id_input = st.sidebar.text_input("Opportunity ID", value="SGS-PERTH-001")
 user_name_input = st.sidebar.text_input("User Name", value="Armand")
 
-# File Uploader
+# File Uploader (UPDATED FOR MULTIPLE FILES)
 st.sidebar.markdown("---")
-uploaded_file = st.sidebar.file_uploader("Upload Context (PDF)", type=['pdf'])
+uploaded_files = st.sidebar.file_uploader(
+    "Upload Context (PDFs)", 
+    type=['pdf'], 
+    accept_multiple_files=True  # <--- THIS ENABLES MULTI-UPLOAD
+)
 
-# --- 2. AGENT FUNCTIONS (Your Core Logic) ---
+# --- 2. AGENT FUNCTIONS ---
 
-def agent_document_parser(uploaded_file):
-    """Extracts text from the uploaded PDF stream."""
-    if not uploaded_file: return "", []
-    try:
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        return f"\n--- CONTENT FROM {uploaded_file.name} ---\n{text}", [uploaded_file.name]
-    except Exception as e:
-        st.error(f"Error reading PDF: {e}")
-        return "", []
+def agent_document_parser(uploaded_files_list):
+    """Extracts text from MULTIPLE uploaded PDF streams."""
+    if not uploaded_files_list: return "", []
+    
+    combined_text = ""
+    file_names = []
+    
+    # Loop through every file uploaded
+    for pdf_file in uploaded_files_list:
+        try:
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            file_text = ""
+            for page in pdf_reader.pages:
+                file_text += page.extract_text() + "\n"
+            
+            combined_text += f"\n--- CONTENT FROM {pdf_file.name} ---\n{file_text}"
+            file_names.append(pdf_file.name)
+        except Exception as e:
+            st.error(f"Error reading {pdf_file.name}: {e}")
+            
+    return combined_text, file_names
 
 def agent_salesforce_mimic():
     """Simulates the Salesforce connection."""
     with st.spinner("🔌 Connecting to Salesforce API..."):
-        time.sleep(1.5) # Fake delay for realism
+        time.sleep(1.5) 
     return {
         "Name": "SGS - Perth - Consolidation",
         "Account": {"Name": "SGS"},
@@ -78,7 +91,6 @@ def agent_salesforce_mimic():
 
 def agent_strategy_brain(sf_data, file_context, key):
     """The AI Core."""
-    # Fallback Data if no API Key provided
     fallback_data = {
         "summary": "Demo Mode: SGS is consolidating 6 labs into one 8,000m² facility. Critical requirement is reuse of existing services.",
         "swot": {
@@ -140,11 +152,9 @@ def agent_strategy_brain(sf_data, file_context, key):
         return fallback_data
 
 def generate_html_report(sf_data, ai_data, uploaded_filenames, user_name):
-    """Generates the exact HTML you loved in the demo."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     fmt_amount = f"${sf_data['Amount']:,.0f}" if sf_data['Amount'] else "N/A"
     
-    # HTML Construction
     stakeholders_html = ""
     for c in sf_data.get('Contacts', []):
         name = c.get('Name')
@@ -156,6 +166,8 @@ def generate_html_report(sf_data, ai_data, uploaded_filenames, user_name):
     for t in sf_data.get('Tasks', []):
         actions_html += f"<tr><td>{t['Subject']}</td><td>{t['Owner']['Name']}</td><td>{t['ActivityDate']}</td><td>{t['Status']}</td></tr>"
 
+    files_list_html = "".join([f"<li>📄 {f}</li>" for f in uploaded_filenames])
+
     chart_labels = [s['name'] for s in ai_data.get('stakeholder_scores', [])]
     chart_influence = [s['influence'] for s in ai_data.get('stakeholder_scores', [])]
     chart_support = [s['support'] for s in ai_data.get('stakeholder_scores', [])]
@@ -163,7 +175,6 @@ def generate_html_report(sf_data, ai_data, uploaded_filenames, user_name):
     win_prob = ai_data.get('win_probability', 30)
     delta_score = sf_data['CustomFields']['Delta_Score__c']
 
-    # Your CSS from the demo
     css = """
     :root { --c-deep-blue: #0B2430; --c-tech-blue: #B7E1E1; --c-stone: #949088; --c-tech-green: #CBE7AC; --c-alert: #ff8b8b; --c-ai-purple: #C084FC; --glass-bg: rgba(255, 255, 255, 0.03); --glass-border: 1px solid rgba(183, 225, 225, 0.15); font-family: 'Inter', sans-serif; background-color: var(--c-deep-blue); color: #fff; line-height: 1.5; }
     body { margin: 0; padding: 20px; }
@@ -268,6 +279,10 @@ def generate_html_report(sf_data, ai_data, uploaded_filenames, user_name):
                         <strong style="color:#C084FC; font-size:0.75rem; text-transform:uppercase; display:block;">Stakeholder Intel (AI Profiling)</strong>
                         <p style="color: rgba(255,255,255,0.8); font-size:0.85rem;">{ai_data['stakeholder_intel']}</p>
                     </div>
+                    <div style="margin-top:15px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                         <strong style="color:var(--c-stone); font-size:0.6rem; text-transform:uppercase;">Processed Files</strong>
+                         <ul style="color:var(--c-tech-green); font-size:0.75rem; padding-left:20px;">{files_list_html}</ul>
+                    </div>
                 </div>
                 
                 <div class="card">
@@ -321,15 +336,15 @@ def generate_html_report(sf_data, ai_data, uploaded_filenames, user_name):
 # --- 3. EXECUTION ---
 
 st.title("Connected Global Intelligence Engine")
-st.markdown("Upload the SGS file to begin the Deep Research simulation.")
+st.markdown("Upload the SGS file (or multiple PDFs) to begin the Deep Research simulation.")
 
-if uploaded_file:
+if uploaded_files:
     # RUN BUTTON
     if st.button("🚀 Run Deep Analysis"):
         sf_data = agent_salesforce_mimic()
         
-        with st.spinner("🧠 AI Agent Reading Documents..."):
-            file_text, file_names = agent_document_parser(uploaded_file)
+        with st.spinner("🧠 AI Agent Reading Multiple Documents..."):
+            file_text, file_names = agent_document_parser(uploaded_files)
         
         with st.spinner("💡 Formulating Strategy..."):
             ai_data = agent_strategy_brain(sf_data, file_text, api_key)
@@ -350,4 +365,4 @@ if uploaded_file:
             mime="text/html"
         )
 else:
-    st.info("👈 Please upload the 'SGS - Perth.pdf' in the sidebar to start.")
+    st.info("👈 Please upload the 'SGS - Perth.pdf' (or multiple files) in the sidebar to start.")
